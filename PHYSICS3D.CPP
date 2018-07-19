@@ -919,20 +919,27 @@ void dynamic_world::updateSleepingBodies(int state)
 	{
 		collision_pair* pair = activePairs[i];
 
-		rigid_body::DynamicState currentState1 = bodies[pair->body1Index].dynamicState[state];
-		rigid_body::DynamicState currentState2 = bodies[pair->body2Index].dynamicState[state];
-
 		// colisiona con pared
 		if (pair->wall_Index >= 0)
 		{
+
 			vector3D normalVector = walls[pair->wall_Index].Normal;
-			// Comprobar si colisiona con el suelo
+			// Comprobar si colisiona con el suelo. En caso contrario, no se actualiza el estado
 			if (normalVector.getX() == 0 && normalVector.getY() == 0 && normalVector.getZ() == 1)
 			{
+				rigid_body::DynamicState* currentState1 = &bodies[pair->body1Index].dynamicState[state];
 
-				real bodySpeedEnergy = currentState1.CMVelocity.squaredLength() + currentState1.AngularVelocity.squaredLength();
+				real bodySpeedEnergy = currentState1->CMVelocity.squaredLength() + currentState1->AngularVelocity.squaredLength();
+
+				//
 				if (bodySpeedEnergy < theshold_sleep)
+				{
 					bodies[pair->body1Index].putToSleep();
+
+					//Fijar las velocidades a 0 puesto que en putToSleep no se hace
+					currentState1->CMVelocity = vector3D(0.0f, 0.0f, 0.0f);
+					currentState1->AngularVelocity = vector3D(0.0f, 0.0f, 0.0f);
+				}
 				else
 					bodies[pair->body1Index].awake();
 			}
@@ -940,24 +947,60 @@ void dynamic_world::updateSleepingBodies(int state)
 		else
 		{
 			// Colisión entre dos objetos
+
+			//Sólo está despierto el objeto1
 			if (!bodies[pair->body1Index].isSleeping() && bodies[pair->body2Index].isSleeping())
 			{
-				real bodySpeedEnergy = currentState1.CMVelocity.squaredLength() + currentState1.AngularVelocity.squaredLength();
+				rigid_body::DynamicState * currentState1 = &bodies[pair->body1Index].dynamicState[state];
+
+				real bodySpeedEnergy = currentState1->CMVelocity.squaredLength() + currentState1->AngularVelocity.squaredLength();
+				//Si tiene una energía superior al theshold_sleep, despertar al objeto2
 				if (bodySpeedEnergy > theshold_sleep)
 					bodies[pair->body2Index].awake();
 				else
+				{
+					//La energía es baja y el objeto1 se frena y se desactiva
 					bodies[pair->body1Index].putToSleep();
+
+					//Fijar las velocidades a 0 puesto que en putToSleep no se hace
+					currentState1->CMVelocity = vector3D(0.0f, 0.0f, 0.0f);
+					currentState1->AngularVelocity = vector3D(0.0f, 0.0f, 0.0f);
+				}
 			}
 			else if (bodies[pair->body1Index].isSleeping() && !bodies[pair->body2Index].isSleeping())
 			{
+				//Sólo está despierto el objeto2
 
-				real bodySpeedEnergy = currentState2.CMVelocity.squaredLength() + currentState2.AngularVelocity.squaredLength();
+				rigid_body::DynamicState *currentState2 = &bodies[pair->body2Index].dynamicState[state];
+
+				real bodySpeedEnergy = currentState2->CMVelocity.squaredLength() + currentState2->AngularVelocity.squaredLength();
+				//Si tiene una energía superior al theshold_sleep, despertar al objeto1
 				if (bodySpeedEnergy > theshold_sleep)
 					bodies[pair->body1Index].awake();
 				else
+				{
+					//La energía es baja y el objeto2 se frena y se desactiva
 					bodies[pair->body2Index].putToSleep();
+
+					//Fijar las velocidades a 0 puesto que en putToSleep no se hace
+					currentState2->CMVelocity = vector3D(0.0f, 0.0f, 0.0f);
+					currentState2->AngularVelocity = vector3D(0.0f, 0.0f, 0.0f);
+				}
 			}
-			// Si los dos objetos están en el mismo estado, no actualizaarlos
+			// Si los dos objetos están en el mismo estado, no actualizarlos
+
+			/*// Si están en un estado distinto, despertar al que no esté activo
+			if (bodies[pair->body1Index].isSleeping() && !bodies[pair->body2Index].isSleeping())
+			{
+				bodies[pair->body1Index].awake();
+			}
+			else
+			{
+				if (!bodies[pair->body1Index].isSleeping() && bodies[pair->body2Index].isSleeping())
+				{
+					bodies[pair->body2Index].awake();
+				}
+			}*/
 		}
 	}
 
